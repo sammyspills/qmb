@@ -6,8 +6,10 @@ Simulate experiment by Kaufman et al. 2016
 """
 
 from scipy.special import factorial as fact
+import scipy as sp
 import numpy as np
 import itertools
+from copy import deepcopy
 
 def vec2bin(vec):
     state_str = ''.join(map(str, vec))
@@ -22,25 +24,27 @@ class StateObj:
     prefactor = 1
 
 def creationOp(state, idx, N):
-    a = state.vector[idx]
+    trans = deepcopy(state)
+    a = trans.vector[idx]
     if(a == N):
-        state.prefactor = 0
+        trans.prefactor = 0
     else:
-        state.vector[idx] += 1
-    return state
+        trans.vector[idx] += 1
+    return trans
 
 def annihilationOp(state, idx):
-    a = state.vector[idx]
+    trans = deepcopy(state)
+    a = trans.vector[idx]
     if(a == 0):
-        state.prefactor = 0
+        trans.prefactor = 0
     else:
-        state.vector[idx] -+ 1
-    return state
+        trans.vector[idx] -= 1
+    return trans
 
 def numberOp(state, idx):
     if(state.vector[idx] == 0):
-        state.prefactor = state.prefactor * -1
-    return state
+        return(-1)
+    return 1
 
 def getBasisStates(N, M):
     
@@ -55,16 +59,58 @@ def getBasisStates(N, M):
     return np.asarray(basis)
 
 def actHam(state, N, J, U):
-    return_state_list = []
+    first_term, second_term = [], []
     # First term
     for i in range(len(state.vector)-1):
-        return_state_list.append()
-
-def getHamMatrix(basis, J, U):
-    ham_matrix = np.zeros((len(basis), len(basis)))
+        temp = creationOp(state, i+1, N)
+        first_term.append(annihilationOp(temp, i))
+        
+        temp2 = creationOp(state, i, N)
+        first_term.append(annihilationOp(temp2, i+1))
+        
+    for i in range(len(state.vector)):
+        new_pre = (numberOp(state, i) ** 2) - numberOp(state, i)
+        trans = deepcopy(state)
+        trans.prefactor = trans.prefactor * new_pre
+        second_term.append(trans)
     
+    for x in first_term:
+        x.prefactor = x.prefactor * J * -1
+    for x in second_term:
+        x.prefactor = x.prefactor * U/2
+        
+    return np.r_[first_term, second_term]
+
+def getHamMatrix(N, M, J, U):
+    basis = getBasisStates(N, M)
+    ham_matrix = np.zeros((len(basis), len(basis)))
+    for state in basis:
+        acted = actHam(state, N, J, U)
+        for x in acted:
+            for b in basis:
+                if(np.all(x.vector == b.vector)):
+                    ham_matrix[state.idx][b.idx] = ham_matrix[state.idx][b.idx] + x.prefactor
+                    
     return ham_matrix
+
+def getInitialState(N, M):
+    
+    initialStateVec = [int(x) for x in input('Enter initial state configuration (e.g. "1, 1, 1, 1, 2, 0"):  ').split(', ')]
+    if(len(initialStateVec) != M):
+        raise ValueError('Length of initial state should match M')
+    if(np.sum(initialStateVec) != N):
+        raise ValueError('Total number of bosons should match N')
+        
+    return StateObj(initialStateVec, 0)
+
+def expHam(hamMatrix, t):
+    new_mat = -1j * hamMatrix * t
+    return sp.linalg.expm(new_mat)
     
 if(__name__ == '__main__'):
     print('In module.')
-    basis = getBasisStates(2, 3)
+    N, M, J, U = [float(x) for x in input('Enter params (comma sep e.g. "2, 2, 1, 1"):  ').split(', ')]
+    N, M = int(N), int(M)
+    initialState = getInitialState(N, M)
+    hamMatrix = getHamMatrix(N, M, J, U)
+    print(expHam(hamMatrix, 1))
