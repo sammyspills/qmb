@@ -48,15 +48,22 @@ def numberOp(state, idx):
 
 def getBasisStates(N, M):
     
-    basis, count = [], 0    
+    basis, sums, states, count = [], [], [], 0    
     x = itertools.product(range(N + 1), repeat=M)
     for i in x:
         if(np.sum(i) == N):
-            state = StateObj(i, count)
-            basis.append(state)
-            count += 1
-    
-    return np.asarray(basis)
+            basis.append(np.asarray(i, dtype=int))
+            val = int(''.join(np.asarray(i, dtype=str)))
+            sums.append(val)
+            
+    for i in range(len(sums)):
+        idx = np.argmin(sums)
+        state = StateObj(basis[idx], count)
+        states.append(state)
+        count += 1
+        sums[idx] = np.inf
+        
+    return np.asarray(states)
 
 def actHam(state, N, J, U):
     first_term, second_term = [], []
