@@ -3,6 +3,8 @@
 author: Sam Spillard
 python script to complete final project of Quantum Many-Body Physics module
 Simulate experiment by Kaufman et al. 2016
+
+TODO: Get RDM
 """
 
 from scipy.special import factorial as fact
@@ -11,10 +13,10 @@ import numpy as np
 import itertools
 from copy import deepcopy
 
-def vec2bin(vec):
-    state_str = ''.join(map(str, vec))
-    idx = int(state_str, 2)
-    return idx
+class tColors:
+    WARN = '\x1b[93m'
+    FAIL = '\x1b[91m'
+    ENDC = '\x1b[0m'
 
 class StateObj:
     def __init__(self, init_vec, idx):
@@ -47,7 +49,6 @@ def numberOp(state, idx):
     return 1
 
 def getBasisStates(N, M):
-    
     basis, sums, states, count = [], [], [], 0    
     x = itertools.product(range(N + 1), repeat=M)
     for i in x:
@@ -96,28 +97,65 @@ def getHamMatrix(N, M, J, U):
         for x in acted:
             for b in basis:
                 if(np.all(x.vector == b.vector)):
-                    ham_matrix[state.idx][b.idx] = ham_matrix[state.idx][b.idx] + x.prefactor
+                    ham_matrix[state.idx][b.idx] = ham_matrix[state
+                              .idx][b.idx] + x.prefactor
                     
-    return ham_matrix
+    return ham_matrix, basis
 
-def getInitialState(N, M):
-    
-    initialStateVec = [int(x) for x in input('Enter initial state configuration (e.g. "1, 1, 1, 1, 2, 0"):  ').split(', ')]
-    if(len(initialStateVec) != M):
-        raise ValueError('Length of initial state should match M')
-    if(np.sum(initialStateVec) != N):
-        raise ValueError('Total number of bosons should match N')
+def getInitialState(N, M, count=0):
+    LENGTH = int((fact(N+M-1))/(fact(N)*fact(M-1)))
+    PREAMBLE = """Enter initial state configuration (e.g. "1, 0, 0").
+Note: This is the normalised vector representing the superposition of basis
+states.
+The basis states are ordered in ascending order of their integer representation
+e.g. the state (0, 0, 2) -> "2" will be before the state (0, 1, 1) -> "11" will
+be before the state (2, 0, 0) -> "200".
+Should have length: C(N+M-1, N)=""" + str(LENGTH) + ': '
+    initialStateVec = np.asarray([float(x) for x in input(PREAMBLE)
+        .split(', ')])
+    if(len(initialStateVec) != LENGTH):
+        print(tColors.FAIL + '\nLength of initial state should be C(N+M-1,'
+            +'N)\n' + tColors.ENDC)
+        input('Press Enter to continue...')
+        count += 1
+        initialStateVec = getInitialState(N,M,count=count)
         
-    return StateObj(initialStateVec, 0)
+    return initialStateVec
 
-def expHam(hamMatrix, t):
-    new_mat = -1j * hamMatrix * t
-    return sp.linalg.expm(new_mat)
+def newState(initialStateVec, hamMatrix, t):
+    expMat = -1j * hamMatrix * t
+    expMat = sp.linalg.expm(expMat)
+    vNewState = np.dot(expMat, initialStateVec)
+    tempSum = np.sum(vNewState)
+    vNewState = vNewState / tempSum
+    return vNewState
     
+def convertToBoson(M, vec, basis):
+    bosons = np.zeros(M, dtype=complex)
+    for i in range(len(vec)):
+        print(vec[i] * basis[i].vector)
+        val = vec[i] * basis[i].vector
+        bosons += val
+    return bosons
+
+def getDensityMatrix(state, N, M):
+    LENGTH = len(state)
+    ASIZE = N+1
+    BSIZE = LENGTH - ALENGTH
+    
+    c_matrix = np.zeros((ASIZE, 2**BLENGTH))
+    print("'A' system - " + str(BLENGTH) + " site(s).")
+    
+    return
+
 if(__name__ == '__main__'):
     print('In module.')
-    N, M, J, U = [float(x) for x in input('Enter params (comma sep e.g. "2, 2, 1, 1"):  ').split(', ')]
+    N, M, J, U = [float(x) for x in input(
+            'Enter params (comma sep e.g. "2, 2, 1, 1"):  ').split(', ')]
     N, M = int(N), int(M)
     initialState = getInitialState(N, M)
-    hamMatrix = getHamMatrix(N, M, J, U)
-    print(expHam(hamMatrix, 1))
+    hamMatrix, basis = getHamMatrix(N, M, J, U)
+    tState = newState(initialState, hamMatrix, 10e-3)
+    tStateBoson = convertToBoson(M, tState, basis)
+    print('New State: ')
+    print(tStateBoson)
