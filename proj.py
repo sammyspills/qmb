@@ -19,13 +19,20 @@ class tColors:
     ENDC = '\x1b[0m'
 
 class StateObj:
+    """
+    Class to keep track of state vector and prefactor.
+    idx is a parameter that keeps basis states organised in the correct order
+    according to the integer representation of the vector.
+    """
     def __init__(self, init_vec, idx):
         self.vector = np.asarray(init_vec)
         self.idx = idx
-    
     prefactor = 1
 
 def creationOp(state, idx, N):
+    """
+    Creation operator for acting on a StateObj
+    """
     trans = deepcopy(state)
     a = trans.vector[idx]
     if(a == N):
@@ -35,6 +42,9 @@ def creationOp(state, idx, N):
     return trans
 
 def annihilationOp(state, idx):
+    """
+    Annihilation operator for acting on a StateObj
+    """
     trans = deepcopy(state)
     a = trans.vector[idx]
     if(a == 0):
@@ -44,29 +54,47 @@ def annihilationOp(state, idx):
     return trans
 
 def numberOp(state, idx):
+    """
+    Number operator for acting on a StateObj
+    """
     if(state.vector[idx] == 0):
         return(-1)
     return 1
 
 def getBasisStates(N, M):
+    """
+    Function to get an list of basis states, ordered by the integer
+    representation of the state vector.
+    """
     basis, sums, states, count = [], [], [], 0    
     x = itertools.product(range(N + 1), repeat=M)
     for i in x:
         if(np.sum(i) == N):
+            # If the vector is a basis state, store the vector
             basis.append(np.asarray(i, dtype=int))
             val = int(''.join(np.asarray(i, dtype=str)))
+            # Store the integer representation of the vector
             sums.append(val)
             
     for i in range(len(sums)):
+        # Store StateObj's of basis vectors, odered from smallest integer
+        # representation to largest
         idx = np.argmin(sums)
         state = StateObj(basis[idx], count)
         states.append(state)
         count += 1
+        # Set to infinity so argmin always picks next-smallest int.rep.
         sums[idx] = np.inf
         
     return np.asarray(states)
 
 def actHam(state, N, J, U):
+    """
+    Act hamiltonian on a state, as a series of Creation, Annihilation and 
+    Number operators. Copy states so that the original state is not effected.
+    Multiply by appropriate parameters, J, U.
+    Returns new states with appropriate prefectors.
+    """
     first_term, second_term = [], []
     # First term
     for i in range(len(state.vector)-1):
@@ -76,6 +104,7 @@ def actHam(state, N, J, U):
         temp2 = creationOp(state, i, N)
         first_term.append(annihilationOp(temp2, i+1))
         
+    # Second term
     for i in range(len(state.vector)):
         new_pre = (numberOp(state, i) ** 2) - numberOp(state, i)
         trans = deepcopy(state)
@@ -90,19 +119,28 @@ def actHam(state, N, J, U):
     return np.r_[first_term, second_term]
 
 def getHamMatrix(N, M, J, U):
+    """
+    Get hamiltonian matrix by acting hamiltonian on each basis state.
+    """
     basis = getBasisStates(N, M)
     ham_matrix = np.zeros((len(basis), len(basis)))
     for state in basis:
+        # Act ham on each basis state
         acted = actHam(state, N, J, U)
         for x in acted:
             for b in basis:
+                # Find the matrix location of the 'acted' state and enter into
+                # Hamiltonian matrix.
                 if(np.all(x.vector == b.vector)):
                     ham_matrix[state.idx][b.idx] = ham_matrix[state
                               .idx][b.idx] + x.prefactor
-                    
+    # Return ham matrix and basis
     return ham_matrix, basis
 
 def getInitialState(N, M, count=0):
+    """
+    Get initial state vector from user.
+    """
     LENGTH = int((fact(N+M-1))/(fact(N)*fact(M-1)))
     PREAMBLE = """Enter initial state configuration (e.g. "1, 0, 0").
 Note: This is the normalised vector representing the superposition of basis
@@ -110,7 +148,7 @@ states.
 The basis states are ordered in ascending order of their integer representation
 e.g. the state (0, 0, 2) -> "2" will be before the state (0, 1, 1) -> "11" will
 be before the state (2, 0, 0) -> "200".
-Should have length: C(N+M-1, N)=""" + str(LENGTH) + ': '
+Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
     initialStateVec = np.asarray([float(x) for x in input(PREAMBLE)
         .split(', ')])
     if(len(initialStateVec) != LENGTH):
@@ -120,9 +158,12 @@ Should have length: C(N+M-1, N)=""" + str(LENGTH) + ': '
         count += 1
         initialStateVec = getInitialState(N,M,count=count)
         
-    return initialStateVec
+    return initialStateVec, LENGTH
 
-def newState(initialStateVec, hamMatrix, t):
+def timeEvolve(initialStateVec, hamMatrix, t):
+    """
+    Evolve a state vector in time according to the hamiltonian matrix.
+    """
     expMat = -1j * hamMatrix * t
     expMat = sp.linalg.expm(expMat)
     vNewState = np.dot(expMat, initialStateVec)
@@ -131,31 +172,42 @@ def newState(initialStateVec, hamMatrix, t):
     return vNewState
     
 def convertToBoson(M, vec, basis):
+    """
+    Convert a state vector (normalised vector corresponding to superposition
+    of basis states) to a boson vector (vector corresponding to boson
+    occupation at each site).
+    """
     bosons = np.zeros(M, dtype=complex)
     for i in range(len(vec)):
-        print(vec[i] * basis[i].vector)
         val = vec[i] * basis[i].vector
         bosons += val
     return bosons
 
-def getDensityMatrix(state, N, M):
-    LENGTH = len(state)
+def getDensityMatrix(state, N, M, combos):
+    """
+    Get density matrix of a state.
+    Input state in boson vector representation e.g. [2, 1, 0]
+    """    
+    rho = np.tensordot(state, state.conj().T, axes=0)
     ASIZE = N+1
-    BSIZE = LENGTH - ALENGTH
+    BSIZE = int(rho.shape[0]/ASIZE)
+    dm = np.reshape(rho, (ASIZE, BSIZE, ASIZE, BSIZE))
+    rdm = np.einsum('jiki->jk', dm)
     
-    c_matrix = np.zeros((ASIZE, 2**BLENGTH))
-    print("'A' system - " + str(BLENGTH) + " site(s).")
-    
-    return
+    return rho, rdm
+
+def init():
+    N, M, J, U = [float(x) for x in input(
+            'Enter params (comma separated: "N, M, J, U"): ').split(', ')]
+    N, M = int(N), int(M)
+    initialState, combos = getInitialState(N, M)
+    hamMatrix, basis = getHamMatrix(N, M, J, U)
+    return {'N': N, 'M': M, 'J': J, 'U': U, 'initState': initialState,
+            'ham': hamMatrix, 'basis': basis, 'combos': combos}
 
 if(__name__ == '__main__'):
     print('In module.')
-    N, M, J, U = [float(x) for x in input(
-            'Enter params (comma sep e.g. "2, 2, 1, 1"):  ').split(', ')]
-    N, M = int(N), int(M)
-    initialState = getInitialState(N, M)
-    hamMatrix, basis = getHamMatrix(N, M, J, U)
-    tState = newState(initialState, hamMatrix, 10e-3)
-    tStateBoson = convertToBoson(M, tState, basis)
-    print('New State: ')
-    print(tStateBoson)
+    initDict = init()
+    tState = timeEvolve(initDict['initState'], initDict['ham'], 10e-3)
+    tStateBoson = convertToBoson(initDict['M'], tState, initDict['basis'])
+    rho, rdm = getDensityMatrix(tState, initDict['N'], initDict["M"], initDict['combos'])
