@@ -24,9 +24,10 @@ class StateObj:
     idx is a parameter that keeps basis states organised in the correct order
     according to the integer representation of the vector.
     """
-    def __init__(self, init_vec, idx):
+    def __init__(self, init_vec, idx, _type):
         self.vector = np.asarray(init_vec)
         self.idx = idx
+        self.type = _type
     prefactor = 1
 
 def creationOp(state, idx, N):
@@ -80,7 +81,7 @@ def getBasisStates(N, M):
         # Store StateObj's of basis vectors, odered from smallest integer
         # representation to largest
         idx = np.argmin(sums)
-        state = StateObj(basis[idx], count)
+        state = StateObj(basis[idx], count, 'boson')
         states.append(state)
         count += 1
         # Set to infinity so argmin always picks next-smallest int.rep.
@@ -158,56 +159,77 @@ Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
         count += 1
         initialStateVec = getInitialState(N,M,count=count)
         
-    return initialStateVec, LENGTH
+    return StateObj(initialStateVec, None, 'state')
 
-def timeEvolve(initialStateVec, hamMatrix, t):
+def timeEvolve(initialState, hamMatrix, t):
     """
     Evolve a state vector in time according to the hamiltonian matrix.
     """
+    if(initialState.type == 'boson'):
+        raise TypeError('State cannot be in boson format.')
     expMat = -1j * hamMatrix * t
     expMat = sp.linalg.expm(expMat)
-    vNewState = np.dot(expMat, initialStateVec)
+    vNewState = np.dot(expMat, initialState.vector)
     tempSum = np.sum(vNewState)
     vNewState = vNewState / tempSum
-    return vNewState
+    newState = StateObj(vNewState, None, 'state')
+    return newState
     
-def convertToBoson(M, vec, basis):
+def convertToBoson(M, state, basis):
     """
     Convert a state vector (normalised vector corresponding to superposition
     of basis states) to a boson vector (vector corresponding to boson
     occupation at each site).
     """
+    if(state.type != 'state'):
+        print(tColors.WARN + 'State to be converted is already bosonic'
+              + tColors.ENDC)
+        return state
     bosons = np.zeros(M, dtype=complex)
-    for i in range(len(vec)):
-        val = vec[i] * basis[i].vector
+    for i in range(len(state.vector)):
+        val = state.vector[i] * basis[i].vector
         bosons += val
-    return bosons
+    state.vector = bosons
+    state.type = 'boson'
+    return bosons    
 
-def getDensityMatrix(state, N, M, combos):
+def getReducedDensityMatrix(state, N, M, basis):
     """
     Get density matrix of a state.
-    Input state in boson vector representation e.g. [2, 1, 0]
-    """    
-    rho = np.tensordot(state, state.conj().T, axes=0)
-    ASIZE = N+1
-    BSIZE = int(rho.shape[0]/ASIZE)
-    dm = np.reshape(rho, (ASIZE, BSIZE, ASIZE, BSIZE))
-    rdm = np.einsum('jiki->jk', dm)
+    Input state in state vector representation e.g. [1/sqrt(2), 1/sqrt(2), 0]
+    """
+    b_basis = []
+    x = itertools.product(range(N+1), repeat=M-1)
+    for i in x:
+        # Get every available state that the B subsystem can be in
+        b_basis.append(np.asarray(i))
+    # Initialise c_matrix as zeros
+    BLEN = len(b_basis)
+    c_matrix = np.zeros((N+1, BLEN), dtype=complex)
+    for i in range(len(state.vector)):
+        a_idx = basis[i].vector[0]
+        _b = basis[i].vector[1:]
+        b_idx = np.where(b_basis==_b)[0]
+        c_matrix[a_idx, b_idx] = state.vector[i]
+        
+    rdm = np.dot(c_matrix, c_matrix.conj().T)
     
-    return rho, rdm
+    return c_matrix, rdm
 
 def init():
     N, M, J, U = [float(x) for x in input(
             'Enter params (comma separated: "N, M, J, U"): ').split(', ')]
     N, M = int(N), int(M)
-    initialState, combos = getInitialState(N, M)
+    initialState = getInitialState(N, M)
     hamMatrix, basis = getHamMatrix(N, M, J, U)
     return {'N': N, 'M': M, 'J': J, 'U': U, 'initState': initialState,
-            'ham': hamMatrix, 'basis': basis, 'combos': combos}
+            'ham': hamMatrix, 'basis': basis}
 
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
     tState = timeEvolve(initDict['initState'], initDict['ham'], 10e-3)
-    tStateBoson = convertToBoson(initDict['M'], tState, initDict['basis'])
-    rho, rdm = getDensityMatrix(tState, initDict['N'], initDict["M"], initDict['combos'])
+    cmat, rdm = getReducedDensityMatrix(tState, initDict['N'], initDict['M'],
+                                  initDict['basis'])
+    
+    
