@@ -227,7 +227,7 @@ def getPlot(initDict, tArr):
     """
     entropy_arr = []
     for t in tArr:
-        print('Time: ' + str(t))
+        print('Time: ' + str(t), flush=True)
         tState = timeEvolve(initDict['initState'], initDict['ham'], t)
         cmat, rdm = getRDM(tState, initDict['N'], initDict['M'],
                            initDict['basis'], initDict['ASIZE'])
@@ -237,7 +237,7 @@ def getPlot(initDict, tArr):
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
-    #plt.savefig('plot.png', format='png', dpi=100)
+    plt.savefig('plot_long.png', format='png', dpi=150)
     return
 
 def init():
@@ -262,4 +262,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 6, 201))
+    getPlot(initDict, np.linspace(0, 25, 1001))
