@@ -249,8 +249,8 @@ def getPlot(initDict, tArr):
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
-    #plt.savefig('plot_long.png', format='png', dpi=150)
-    plt.show()
+    plt.savefig('plot_long.png', format='png', dpi=150)
+    #plt.show()
     return
 
 def init():
@@ -275,4 +275,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 15, 26))
+    getPlot(initDict, np.linspace(0, 18, 801))
