@@ -150,7 +150,10 @@ e.g. the state (0, 2) -> "2" will be [1, 0, 0], the state (1, 1) -> "11" will
 be [0, 1, 0] and the state (2, 0) -> "20" will be [0, 0, 1].
 Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
     if(default):
-        idx = int(LENGTH/2)
+        temp_basis = np.asarray([x.vector for x in getBasisStates(N, M)])
+        for i in range(len(temp_basis)):
+            if(np.all(temp_basis[i] == np.ones(M))):
+                idx = i
         initialStateVec = np.zeros(LENGTH)
         initialStateVec[idx] = 1
         state = StateObj(initialStateVec, None, 'state')
@@ -201,9 +204,16 @@ def getRDM(state, N, M, basis, ASIZE=1):
     c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
     for i in range(len(state.vector)):
         _a = basis[i].vector[:ASIZE]
+        # Get matrix indices for entry
+        #for i in range(len(a_basis)):
+        #    if(np.all(a_basis[i] == _a)):
+        #        a_idx = i
         a_idx = np.where(a_basis == _a)[0]
         _b = basis[i].vector[ASIZE:]
-        b_idx = np.where(b_basis==_b)[0]
+        #for i in range(len(b_basis)):
+        #    if(np.all(b_basis[i] == _b)):
+        #        b_idx = i
+        b_idx = np.where(b_basis == _b)[0]
         c_matrix[a_idx, b_idx] = state.vector[i]
         
     rdm = np.dot(c_matrix, c_matrix.conj().T)
@@ -237,7 +247,8 @@ def getPlot(initDict, tArr):
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
-    plt.savefig('plot_long.png', format='png', dpi=150)
+    #plt.savefig('plot_long.png', format='png', dpi=150)
+    plt.show()
     return
 
 def init():
@@ -262,4 +273,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 25, 1001))
+    getPlot(initDict, np.linspace(0, 15, 101))
