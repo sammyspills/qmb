@@ -154,6 +154,7 @@ Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
         for i in range(len(temp_basis)):
             if(np.all(temp_basis[i] == np.ones(M))):
                 idx = i
+                break
         initialStateVec = np.zeros(LENGTH)
         initialStateVec[idx] = 1
         state = StateObj(initialStateVec, None, 'state')
@@ -203,19 +204,20 @@ def getRDM(state, N, M, basis, ASIZE=1):
     ALEN, BLEN = len(a_basis), len(b_basis)
     c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
     for i in range(len(state.vector)):
-        _a = basis[i].vector[:ASIZE]
+        a_vec = basis[i].vector[:ASIZE]
         # Get matrix indices for entry
-        #for i in range(len(a_basis)):
-        #    if(np.all(a_basis[i] == _a)):
-        #        a_idx = i
-        a_idx = np.where(a_basis == _a)[0]
-        _b = basis[i].vector[ASIZE:]
-        #for i in range(len(b_basis)):
-        #    if(np.all(b_basis[i] == _b)):
-        #        b_idx = i
-        b_idx = np.where(b_basis == _b)[0]
-        c_matrix[a_idx, b_idx] = state.vector[i]
+        for j in range(len(a_basis)):
+            if(np.all(a_basis[j] == a_vec)):
+                a_idx = j
+                break
+        b_vec = basis[i].vector[ASIZE:]
+        for j in range(len(b_basis)):
+            if(np.all(b_basis[j] == b_vec)):
+                b_idx = j
+                break
         
+        c_matrix[a_idx, b_idx] = state.vector[i]
+    
     rdm = np.dot(c_matrix, c_matrix.conj().T)
     
     return c_matrix, rdm
@@ -273,4 +275,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 15, 101))
+    getPlot(initDict, np.linspace(0, 15, 26))
