@@ -29,8 +29,8 @@ class StateObj:
     Class to keep track of state vector, prefactor and type
     idx is a parameter that keeps basis states in the correct order according
     to the integer representation of the vector.
-    Includes creation, annihilation and number operators, but be careful to
-    copy states when manipulating them as to avoid modifying basis states!
+    Includes creation, annihilation and number operators, deepcopy'd to prevent
+    modifying basis states.
     """
     # Initialise attributes
     def __init__(self, init_vec, idx, _type):
@@ -42,20 +42,20 @@ class StateObj:
         self.prefactor = 1
     # Creation operator
     def create(self, index, N):
-        a = self.vector[index]
-        if(a == N):
-            self.prefactor = 0
+        trans = deepcopy(self)
+        if(trans.vector[index] == N):
+            trans.prefactor = 0
         else:
-            self.vector[index] += 1
-        return self
+            trans.vector[index] += 1
+        return trans
     # Annihilation operator
     def destroy(self, index):
-        a = self.vector[index]
-        if(a == 0):
-            self.prefactor = 0
+        trans = deepcopy(self)
+        if(trans.vector[index] == 0):
+            trans.prefactor = 0
         else:
-            self.vector[index] -= 1
-        return self
+            trans.vector[index] -= 1
+        return trans
     # Number operator
     def num(self, index):
         if(self.vector[index] == 0):
@@ -64,58 +64,38 @@ class StateObj:
 
 def getBasisStates(N, M):
     """
-    Function to get an list of basis states, ordered by the integer
+    Function to get a list of basis states, ordered by the integer
     representation of the state vector.
     """
-    basis, sums, states, count = [], [], [], 0    
     x = itertools.product(range(N + 1), repeat=M)
-    for i in x:
-        if(np.sum(i) == N):
-            # If the vector is a basis state, store the vector
-            basis.append(np.asarray(i, dtype=int))
-            val = int(''.join(np.asarray(i, dtype=str)))
-            # Store the integer representation of the vector
-            sums.append(val)
-            
-    for i in range(len(sums)):
-        # Store StateObj's of basis vectors, odered from smallest integer
-        # representation to largest
-        idx = np.argmin(sums)
-        state = StateObj(basis[idx], count, 'boson')
-        states.append(state)
-        count += 1
-        # Set to infinity so argmin always picks next-smallest integer rep.
-        sums[idx] = np.inf
-        
-    return np.asarray(states)
+    basis = [np.asarray(i, dtype=int) for i in x if np.sum(i)==N]
+    states = np.asarray([StateObj(basis[i], i, 'boson') for i in
+                        range(len(basis))])
+
+    return states
 
 def actHam(state, N, J, U):
     """
-    Act hamiltonian on a state, as a series of Creation, Annihilation and 
-    Number operators. Copy states so that the original state is not effected.
+    Act hamiltonian on a state, as a series of Creation, Annihilation and
+    Number operators.
     Multiply by appropriate parameters, J, U.
     Returns an array of new states with appropriate prefactors.
     """
     t1, t2 = [], []
     # First term
     for i in range(len(state.vector)-1):
-        temp = deepcopy(state).create(i+1, N)
-        t1.append(temp.destroy(i))
-        
-        temp2 = deepcopy(state).create(i, N)
-        t1.append(temp2.destroy(i+1))
+        t1.append(state.create(i+1, N).destroy(i))
+        t1.append(state.create(i, N).destroy(i+1))
     # Second term
     for i in range(len(state.vector)):
-        PREFACTOR = (deepcopy(state).num(i)**2) - deepcopy(state).num(i)
+        PREFACTOR = (state.num(i)**2) - state.num(i)
         temp3 = deepcopy(state)
-        temp3.prefactor *= PREFACTOR
+        temp3.prefactor *= (PREFACTOR*U/2)
         t2.append(temp3)
-        
+
     for state in t1:
         state.prefactor *= (-1 * J)
-    for state in t2:
-        state.prefactor *= (U/2)
-        
+
     return np.r_[t1, t2]
 
 def getHamMatrix(N, M, J, U):
@@ -132,8 +112,7 @@ def getHamMatrix(N, M, J, U):
                 # Find the matrix location of the 'acted' state and enter into
                 # Hamiltonian matrix.
                 if(np.all(x.vector == b.vector)):
-                    ham_matrix[state.idx][b.idx] = ham_matrix[state
-                              .idx][b.idx] + x.prefactor
+                    ham_matrix[state.idx][b.idx] += x.prefactor
     # Return ham matrix and basis
     return ham_matrix, basis
 
@@ -158,7 +137,7 @@ Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
         initialStateVec = np.zeros(LENGTH)
         initialStateVec[idx] = 1
         state = StateObj(initialStateVec, None, 'state')
-        
+
     else:
         initialStateVec = np.asarray([float(x) for x in input(PREAMBLE)
             .split(', ')])
@@ -191,35 +170,32 @@ def getRDM(state, N, M, basis, ASIZE=1):
     Get reduced density matrix of a state.
     Input state in basis vector representation e.g. [1/sqrt(2), 1/sqrt(2), 0]
     """
-    a_basis, b_basis = [], []
-    a = itertools.product(range(N+1), repeat=ASIZE)
-    for i in a:
-        # Get every available state that the A subsystem can be in
-        a_basis.append(np.asarray(i))
-    b = itertools.product(range(N+1), repeat=M-ASIZE)
-    for i in b:
-        # Get every available state that the B subsystem can be in
-        b_basis.append(np.asarray(i))
+    # Every available a state
+    a_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
+                            repeat=ASIZE)])
+    # Every available b state
+    b_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
+                            repeat=(M-ASIZE))])
     # Initialise c_matrix as zeros
     ALEN, BLEN = len(a_basis), len(b_basis)
     c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
     for i in range(len(state.vector)):
         a_vec = basis[i].vector[:ASIZE]
         # Get matrix indices for entry
-        for j in range(len(a_basis)):
+        for j in range(ALEN):
             if(np.all(a_basis[j] == a_vec)):
                 a_idx = j
                 break
         b_vec = basis[i].vector[ASIZE:]
-        for j in range(len(b_basis)):
+        for j in range(BLEN):
             if(np.all(b_basis[j] == b_vec)):
                 b_idx = j
                 break
-        
+
         c_matrix[a_idx, b_idx] = state.vector[i]
-    
+
     rdm = np.dot(c_matrix, c_matrix.conj().T)
-    
+
     return c_matrix, rdm
 
 def entropy(rdm):
@@ -228,8 +204,7 @@ def entropy(rdm):
     """
     rdm2 = np.dot(rdm, rdm)
     vals, vecs = sp.linalg.eigh(rdm2)
-    _sum = np.sum(vals)
-    _entropy = -np.log(_sum)
+    _entropy = -np.log(np.sum(vals))
     return _entropy
 
 def getPlot(initDict, tArr):
@@ -249,7 +224,7 @@ def getPlot(initDict, tArr):
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
-    plt.savefig('plot_long.png', format='png', dpi=150)
+    plt.savefig('plot.png', format='png', dpi=200)
     #plt.show()
     return
 
