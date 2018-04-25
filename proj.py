@@ -29,8 +29,8 @@ class StateObj:
     Class to keep track of state vector, prefactor and type
     idx is a parameter that keeps basis states in the correct order according
     to the integer representation of the vector.
-    Includes creation, annihilation and number operators, deepcopy'd to prevent
-    modifying basis states.
+    Includes creation, annihilation, number, time evolution and rdm operators
+    deepcopy'd to prevent modifying basis states.
     """
     # Initialise attributes
     def __init__(self, init_vec, idx, _type):
@@ -61,6 +61,49 @@ class StateObj:
         if(self.vector[index] == 0):
             return -1
         return 1
+    # Time Evolution
+    def tevolve(self, hamMatrix, t):
+        if(self.type == 'boson'):
+            raise TypeError('State should not be in boson format')
+        trans = deepcopy(self)
+        expMat = sp.linalg.expm(-1j * hamMatrix * t)
+        trans.vector = np.dot(expMat, self.vector)
+        return trans
+    # Reduced Density Matrix
+    def rdm(self, N, M, basis, ASIZE=1):
+        # Every available a state
+        a_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
+                                repeat=ASIZE)])
+        # Every available b state
+        b_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
+                                repeat=(M-ASIZE))])
+        # Initialise c_matrix as zeros
+        ALEN, BLEN = len(a_basis), len(b_basis)
+        c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
+        for i in range(len(self.vector)):
+            a_vec = basis[i].vector[:ASIZE]
+            # Get matrix indices for entry
+            for j in range(ALEN):
+                if(np.all(a_basis[j] == a_vec)):
+                    a_idx = j
+                    break
+            b_vec = basis[i].vector[ASIZE:]
+            for j in range(BLEN):
+                if(np.all(b_basis[j] == b_vec)):
+                    b_idx = j
+                    break
+
+            c_matrix[a_idx, b_idx] = self.vector[i]
+
+        RDM = np.dot(c_matrix, c_matrix.conj().T)
+
+        return RDM
+    # Entropy
+    def entropy(self, N, M, basis, ASIZE):
+        rdm = self.rdm(N, M, basis, ASIZE)
+        vals, vecs = sp.linalg.eigh(np.dot(rdm, rdm))
+        return -np.log(np.sum(vals))
+
 
 def getBasisStates(N, M):
     """
@@ -153,60 +196,6 @@ Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
             state = StateObj(initialStateVec, None, 'state')
     return state
 
-def timeEvolve(initialState, hamMatrix, t):
-    """
-    Evolve a state vector to time t, according to the hamiltonian matrix.
-    """
-    if(initialState.type == 'boson'):
-        raise TypeError('State should not be in boson format.')
-    expMat = -1j * hamMatrix * t
-    expMat = sp.linalg.expm(expMat)
-    vNewState = np.dot(expMat, initialState.vector)
-    newState = StateObj(vNewState, None, 'state')
-    return newState
-
-def getRDM(state, N, M, basis, ASIZE=1):
-    """
-    Get reduced density matrix of a state.
-    Input state in basis vector representation e.g. [1/sqrt(2), 1/sqrt(2), 0]
-    """
-    # Every available a state
-    a_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
-                            repeat=ASIZE)])
-    # Every available b state
-    b_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
-                            repeat=(M-ASIZE))])
-    # Initialise c_matrix as zeros
-    ALEN, BLEN = len(a_basis), len(b_basis)
-    c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
-    for i in range(len(state.vector)):
-        a_vec = basis[i].vector[:ASIZE]
-        # Get matrix indices for entry
-        for j in range(ALEN):
-            if(np.all(a_basis[j] == a_vec)):
-                a_idx = j
-                break
-        b_vec = basis[i].vector[ASIZE:]
-        for j in range(BLEN):
-            if(np.all(b_basis[j] == b_vec)):
-                b_idx = j
-                break
-
-        c_matrix[a_idx, b_idx] = state.vector[i]
-
-    rdm = np.dot(c_matrix, c_matrix.conj().T)
-
-    return c_matrix, rdm
-
-def entropy(rdm):
-    """
-    Given a reduced density matrix, return the Renyi entropy
-    """
-    rdm2 = np.dot(rdm, rdm)
-    vals, vecs = sp.linalg.eigh(rdm2)
-    _entropy = -np.log(np.sum(vals))
-    return _entropy
-
 def getPlot(initDict, tArr):
     """
     Given dictionary of initial parameters and an array of times to evaluate
@@ -215,17 +204,16 @@ def getPlot(initDict, tArr):
     entropy_arr = []
     for t in tArr:
         print('Time: ' + str(t), flush=True)
-        tState = timeEvolve(initDict['initState'], initDict['ham'], t)
-        cmat, rdm = getRDM(tState, initDict['N'], initDict['M'],
-                           initDict['basis'], initDict['ASIZE'])
-        tEntropy = entropy(rdm)
+        tState = initDict['initState'].tevolve(initDict['ham'], t)
+        tEntropy = tState.entropy(initDict['N'], initDict['M'],
+                        initDict['basis'], initDict['ASIZE'])
         entropy_arr.append(tEntropy)
     plt.plot(tArr, entropy_arr)
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
-    plt.savefig('plot_simple.png', format='png', dpi=200)
-    #plt.show()
+    #plt.savefig('plot_simple.png', format='png', dpi=200)
+    plt.show()
     return
 
 def init():
