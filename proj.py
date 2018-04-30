@@ -29,8 +29,8 @@ class StateObj:
     Class to keep track of state vector, prefactor and type
     idx is a parameter that keeps basis states in the correct order according
     to the integer representation of the vector.
-    Includes creation, annihilation, number, time evolution and rdm operators
-    deepcopy'd to prevent modifying basis states.
+    Includes creation, annihilation, number, time evolution, rdm and entropy
+    operators, deepcopy'd to prevent modifying basis states.
     """
     # Initialise attributes
     def __init__(self, init_vec, idx, _type):
@@ -47,6 +47,7 @@ class StateObj:
             trans.prefactor = 0
         else:
             trans.vector[index] += 1
+            trans.prefactor *= np.sqrt(trans.vector[index])
         return trans
     # Annihilation operator
     def destroy(self, index):
@@ -54,6 +55,7 @@ class StateObj:
         if(trans.vector[index] == 0):
             trans.prefactor = 0
         else:
+            trans.prefactor *= np.sqrt(trans.vector[index])
             trans.vector[index] -= 1
         return trans
     # Number operator
@@ -72,11 +74,11 @@ class StateObj:
     # Reduced Density Matrix
     def rdm(self, N, M, basis, ASIZE=1):
         # Every available a state
-        a_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
-                                repeat=ASIZE)])
+        a_basis = np.asarray([np.asarray(i) for i in itertools.product(
+                range(N+1), repeat=ASIZE)])
         # Every available b state
-        b_basis = np.asarray([np.asarray(i) for i in itertools.product(range(N+1),
-                                repeat=(M-ASIZE))])
+        b_basis = np.asarray([np.asarray(i) for i in itertools.product(
+                range(N+1), repeat=(M-ASIZE))])
         # Initialise c_matrix as zeros
         ALEN, BLEN = len(a_basis), len(b_basis)
         c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
@@ -174,7 +176,7 @@ Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
     if(default):
         temp_basis = np.asarray([x.vector for x in getBasisStates(N, M)])
         for i in range(len(temp_basis)):
-            if(np.all(temp_basis[i] == np.ones(M))):
+            if(np.prod(temp_basis[i])==1):
                 idx = i
                 break
         initialStateVec = np.zeros(LENGTH)
@@ -204,9 +206,8 @@ def getPlot(initDict, tArr):
     entropy_arr = []
     for t in tArr:
         print('Time: ' + str(t), flush=True)
-        tState = initDict['initState'].tevolve(initDict['ham'], t)
-        tEntropy = tState.entropy(initDict['N'], initDict['M'],
-                        initDict['basis'], initDict['ASIZE'])
+        tEntropy = initDict['initState'].tevolve(initDict['ham'], t).entropy(
+            initDict['N'], initDict['M'], initDict['basis'], initDict['ASIZE'])
         entropy_arr.append(tEntropy)
     plt.plot(tArr, entropy_arr)
     plt.xlabel('Time (s)')
@@ -238,4 +239,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 4.5, 401))
+    getPlot(initDict, np.linspace(0, 17.5, 401))
