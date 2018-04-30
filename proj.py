@@ -95,7 +95,7 @@ class StateObj:
                     b_idx = j
                     break
 
-            c_matrix[a_idx, b_idx] = self.vector[i]
+            c_matrix[a_idx, b_idx] = self.vector[i]*self.prefactor
 
         RDM = np.dot(c_matrix, c_matrix.conj().T)
 
@@ -213,7 +213,8 @@ def getPlot(initDict, tArr):
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
-    #plt.savefig('plot_simple.png', format='png', dpi=200)
+    plt.ylim((-0.1, 4))
+    plt.savefig('plot.png', format='png', dpi=200)
     plt.show()
     return
 
