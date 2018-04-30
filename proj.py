@@ -11,6 +11,7 @@ from scipy.special import factorial as fact
 import scipy as sp
 import numpy as np
 import itertools
+import timeit
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -214,7 +215,7 @@ def getPlot(initDict, tArr):
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
     plt.ylim((-0.1, 4))
-    plt.savefig('plot.png', format='png', dpi=200)
+    #plt.savefig('plot.png', format='png', dpi=200)
     plt.show()
     return
 
@@ -230,6 +231,8 @@ def init():
                              + '(yes:1/no:0): ')))
     initialState = getInitialState(N, M, default=default)
     hamMatrix, basis = getHamMatrix(N, M, J, U)
+    print(hamMatrix)
+    print(initialState)
     if(bool(int(input('Print 4 lowest energies? (yes:1, no:0): ')))):
         vals, vecs = sp.linalg.eigh(hamMatrix)
         print(vals[:4])
@@ -240,4 +243,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 17.5, 401))
+    getPlot(initDict, np.linspace(0, 17.5, 101))]
