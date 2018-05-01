@@ -11,19 +11,10 @@ from scipy.special import factorial as fact
 import scipy as sp
 import numpy as np
 import itertools
-import timeit
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set()
-
-class tColors:
-    """
-    Color class for debugging
-    """
-    WARN = '\x1b[93m'
-    FAIL = '\x1b[91m'
-    ENDC = '\x1b[0m'
 
 class StateObj:
     """
@@ -61,9 +52,7 @@ class StateObj:
         return trans
     # Number operator
     def num(self, index):
-        if(self.vector[index] == 0):
-            return -1
-        return 1
+        return self.vector[index]
     # Time Evolution
     def tevolve(self, hamMatrix, t):
         if(self.type == 'boson'):
@@ -162,41 +151,20 @@ def getHamMatrix(N, M, J, U):
     # Return ham matrix and basis
     return ham_matrix, basis
 
-def getInitialState(N, M, count=0, default=False):
+def getInitialState(N, M):
     """
     Get initial state vector from user.
     """
     LENGTH = int((fact(N+M-1))/(fact(N)*fact(M-1)))
-    PREAMBLE = """Enter initial state configuration (e.g. "1, 0, 0").
-Note: This is the normalised vector representing the superposition of basis
-states.
-The basis states are ordered in ascending order of their integer representation
-e.g. the state (0, 2) -> "2" will be [1, 0, 0], the state (1, 1) -> "11" will
-be [0, 1, 0] and the state (2, 0) -> "20" will be [0, 0, 1].
-Should have length: C(N+M-1, N) = """ + str(LENGTH) + ': '
-    if(default):
-        temp_basis = np.asarray([x.vector for x in getBasisStates(N, M)])
-        for i in range(len(temp_basis)):
-            if(np.prod(temp_basis[i])==1):
-                idx = i
-                break
-        initialStateVec = np.zeros(LENGTH)
-        initialStateVec[idx] = 1
-        state = StateObj(initialStateVec, None, 'state')
+    temp_basis = np.asarray([x.vector for x in getBasisStates(N, M)])
+    for i in range(len(temp_basis)):
+        if(np.prod(temp_basis[i])==1):
+            idx = i
+            break
+    initialStateVec = np.zeros(LENGTH)
+    initialStateVec[idx] = 1
+    state = StateObj(initialStateVec, None, 'state')
 
-    else:
-        initialStateVec = np.asarray([float(x) for x in input(PREAMBLE)
-            .split(', ')])
-        if(len(initialStateVec) != LENGTH or np.sum(np.square(
-                initialStateVec)) != 1.):
-            print(tColors.FAIL + '\nLength of initial state should be C(N+M-1,'
-                                + 'N)\nState should be normalised.'
-                                + tColors.ENDC)
-            input('Press Enter to continue...')
-            count += 1
-            state = getInitialState(N,M,count=count)
-        else:
-            state = StateObj(initialStateVec, None, 'state')
     return state
 
 def getPlot(initDict, tArr):
@@ -206,14 +174,14 @@ def getPlot(initDict, tArr):
     """
     entropy_arr = []
     for t in tArr:
-        print('Time: ' + str(t), flush=True)
+        #print('Time: ' + str(t), flush=True)
         tEntropy = initDict['initState'].tevolve(initDict['ham'], t).entropy(
             initDict['N'], initDict['M'], initDict['basis'], initDict['ASIZE'])
         entropy_arr.append(tEntropy)
     plt.plot(tArr, entropy_arr)
     plt.xlabel('Time (s)')
     plt.ylabel('Renyi entropy: $S_{A}$')
-    plt.title('Renyi entropy vs Time for Bose-Hubbard model, equal bipartition')
+    plt.title('Renyi entropy for Bose-Hubbard model, equal bipartition')
     plt.ylim((-0.1, 4))
     #plt.savefig('plot.png', format='png', dpi=200)
     plt.show()
@@ -227,12 +195,8 @@ def init():
     N, M, J, U = [float(x) for x in input(
             'Enter params (comma separated: "N, M, J, U"): ').split(', ')]
     N, M = int(N), int(M)
-    default = bool(int(input('Use default initial state? (1, 1, 1...)'
-                             + '(yes:1/no:0): ')))
-    initialState = getInitialState(N, M, default=default)
+    initialState = getInitialState(N, M)
     hamMatrix, basis = getHamMatrix(N, M, J, U)
-    print(hamMatrix)
-    print(initialState)
     if(bool(int(input('Print 4 lowest energies? (yes:1, no:0): ')))):
         vals, vecs = sp.linalg.eigh(hamMatrix)
         print(vals[:4])
@@ -243,4 +207,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 17.5, 101))]
+    getPlot(initDict, np.linspace(0, 17.5, 501))
