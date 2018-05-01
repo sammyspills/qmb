@@ -123,7 +123,7 @@ def actHam(state, N, J, U):
         t1.append(state.create(i, N).destroy(i+1))
     # Second term
     for i in range(len(state.vector)):
-        PREFACTOR = (state.num(i)**2) - state.num(i)
+        PREFACTOR = state.num(i) * (state.num(i) - 1)
         temp3 = deepcopy(state)
         temp3.prefactor *= (PREFACTOR*U/2)
         t2.append(temp3)
