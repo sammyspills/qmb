@@ -35,7 +35,7 @@ class StateObj:
     # Creation operator
     def create(self, index, N):
         trans = deepcopy(self)
-        if(trans.vector[index] == N):
+        if(np.sum(trans.vector) > N):
             trans.prefactor = 0
         else:
             trans.vector[index] += 1
@@ -183,7 +183,7 @@ def getPlot(initDict, tArr):
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy for Bose-Hubbard model, equal bipartition')
     plt.ylim((-0.1, 4))
-    plt.savefig('plot.png', format='png', dpi=200)
+    #plt.savefig('plot.png', format='png', dpi=200)
     plt.show()
     return
 
