@@ -123,7 +123,7 @@ def actHam(state, N, J, U):
         t1.append(state.create(i, N).destroy(i+1))
     # Second term
     for i in range(len(state.vector)):
-        PREFACTOR = (state.num(i)**2) - state.num(i)
+        PREFACTOR = state.num(i) * (state.num(i) - 1)
         temp3 = deepcopy(state)
         temp3.prefactor *= (PREFACTOR*U/2)
         t2.append(temp3)
@@ -174,7 +174,7 @@ def getPlot(initDict, tArr):
     """
     entropy_arr = []
     for t in tArr:
-        #print('Time: ' + str(t), flush=True)
+        print('Time: ' + str(t), flush=True)
         tEntropy = initDict['initState'].tevolve(initDict['ham'], t).entropy(
             initDict['N'], initDict['M'], initDict['basis'], initDict['ASIZE'])
         entropy_arr.append(tEntropy)
@@ -183,7 +183,7 @@ def getPlot(initDict, tArr):
     plt.ylabel('Renyi entropy: $S_{A}$')
     plt.title('Renyi entropy for Bose-Hubbard model, equal bipartition')
     plt.ylim((-0.1, 4))
-    #plt.savefig('plot.png', format='png', dpi=200)
+    plt.savefig('plot.png', format='png', dpi=200)
     plt.show()
     return
 
@@ -207,4 +207,4 @@ def init():
 if(__name__ == '__main__'):
     print('In module.')
     initDict = init()
-    getPlot(initDict, np.linspace(0, 17.5, 501))
+    getPlot(initDict, np.linspace(0, 14, 401))
