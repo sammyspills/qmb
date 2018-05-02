@@ -64,27 +64,24 @@ class StateObj:
     # Reduced Density Matrix
     def rdm(self, N, M, basis, ASIZE=1):
         # Every available a state
-        a_basis = np.asarray([np.asarray(i) for i in itertools.product(
-                range(N+1), repeat=ASIZE)])
+        a_basis_ints =[int(''.join([str(i) for i in j])) for j in np.asarray(
+                [np.asarray(i) for i in itertools.product(range(N+1),
+                            repeat=ASIZE)])]
         # Every available b state
-        b_basis = np.asarray([np.asarray(i) for i in itertools.product(
-                range(N+1), repeat=(M-ASIZE))])
+        b_basis_ints =[int(''.join([str(i) for i in j])) for j in np.asarray(
+                [np.asarray(i) for i in itertools.product(range(N+1),
+                            repeat=(M-ASIZE))])]
         # Initialise c_matrix as zeros
-        ALEN, BLEN = len(a_basis), len(b_basis)
+        ALEN, BLEN = len(a_basis_ints), len(b_basis_ints)
         c_matrix = np.zeros((ALEN, BLEN), dtype=complex)
         for i in range(len(self.vector)):
             a_vec = basis[i].vector[:ASIZE]
-            # Get matrix indices for entry
-            for j in range(ALEN):
-                if(np.all(a_basis[j] == a_vec)):
-                    a_idx = j
-                    break
             b_vec = basis[i].vector[ASIZE:]
-            for j in range(BLEN):
-                if(np.all(b_basis[j] == b_vec)):
-                    b_idx = j
-                    break
-
+            
+            # Get matrix indices for entry
+            a_idx = findIndex(a_basis_ints, a_vec)
+            b_idx = findIndex(b_basis_ints, b_vec)
+            
             c_matrix[a_idx, b_idx] = self.vector[i]*self.prefactor
 
         RDM = np.dot(c_matrix, c_matrix.conj().T)
@@ -96,6 +93,28 @@ class StateObj:
         vals, vecs = sp.linalg.eigh(np.dot(rdm, rdm))
         return -np.log(np.sum(vals))
 
+def findIndex(basis_ints, state_vector):
+    """
+    Implementation of binary search specifically for finding index of a vector
+    in a Fock space
+    In
+    """
+    state_int = int(''.join([str(i) for i in state_vector]))
+    upper, lower, found, count = int(len(basis_ints)), 0, False, 0
+    while not found:
+        if(count>len(basis_ints)):
+            raise RecursionError('State not found in basis')
+        count += 1
+        mid = int((upper + lower)/2)
+        if(state_int == basis_ints[mid]):
+            index = mid
+            found = True
+        elif(state_int > basis_ints[mid]):
+            lower = mid
+        else:
+            upper = mid
+            
+    return index
 
 def getBasisStates(N, M):
     """
