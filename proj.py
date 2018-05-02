@@ -97,7 +97,13 @@ def findIndex(basis_ints, state_vector):
     """
     Implementation of binary search specifically for finding index of a vector
     in a Fock space
-    In
+    
+    Parameters:
+        :basis_ints: Array of integer representations of basis vectors
+        :state_vector: State vector
+        
+    Returns:
+        :index: Index where basis state and input state match
     """
     state_int = int(''.join([str(i) for i in state_vector]))
     upper, lower, found, count = int(len(basis_ints)), 0, False, 0
